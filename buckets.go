@@ -11,8 +11,6 @@ import (
 type Buckets interface {
 	Insert(float64)
 	InsertN(float64, uint64)
-	Remove(float64)
-	RemoveN(float64, uint64)
 	Total() uint64
 	Count(float64) uint64
 	Range(func(Bucket))

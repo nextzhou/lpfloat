@@ -57,36 +57,6 @@ func (b *UnSyncBuckets) InsertN(f float64, count uint64) {
 	})
 }
 
-func (b *UnSyncBuckets) Remove(f float64) {
-	lpf := FromFloat64(f)
-	for i := range b.layers {
-		layer := &b.layers[i]
-		if layer.signAndExp != lpf.SignAndExp {
-			continue
-		}
-		count := layer.buckets[lpf.Fraction]
-		if count > 0 {
-			b.total--
-			layer.buckets[lpf.Fraction]--
-		}
-	}
-}
-
-func (b *UnSyncBuckets) RemoveN(f float64, count uint64) {
-	lpf := FromFloat64(f)
-	for i := range b.layers {
-		layer := &b.layers[i]
-		if layer.signAndExp != lpf.SignAndExp {
-			continue
-		}
-		c := layer.buckets[lpf.Fraction]
-		if c >= count {
-			b.total -= count
-			layer.buckets[lpf.Fraction] -= count
-		}
-	}
-}
-
 func (b *UnSyncBuckets) Total() uint64 {
 	return b.total
 }
