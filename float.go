@@ -55,6 +55,14 @@ func (f LPFloat) ToFloat64() float64 {
 	return math.Float64frombits(bits)
 }
 
+func (f LPFloat) AlmostEqual(rhs LPFloat) bool {
+	return f.Fraction == rhs.Fraction && f.SignAndExp == rhs.SignAndExp
+}
+
+func (f LPFloat) AlmostEqualF64(rhs float64) bool {
+	return f.AlmostEqual(FromFloat64(rhs))
+}
+
 func (f LPFloat) String() string {
 	return strconv.FormatFloat(f.ToFloat64(), 'g', -1, 64)
 }
