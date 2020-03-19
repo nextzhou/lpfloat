@@ -147,3 +147,10 @@ func (b *UnSyncBuckets) Summary(percentilesCfg []float32) Summary {
 	summary.Avg = FromFloat64(sum / float64(summary.Total))
 	return summary
 }
+
+func (b *UnSyncBuckets) Reset() {
+	b.total = 0
+	for i := range b.layers {
+		b.layers[i].buckets = emptyBuckets
+	}
+}

@@ -103,25 +103,40 @@ func TestBuckets(t *testing.T) {
 	const minVal = 0.01
 	data := randomData(size, minVal, maxVal)
 
-	for _, buckets := range bucketsList {
-		insertBuckets(buckets, data)
-		if buckets.Total() != size {
-			t.Fatal("")
+	prepareData := func() {
+		for _, buckets := range bucketsList {
+			insertBuckets(buckets, data)
+			if buckets.Total() != size {
+				t.Fatal("")
+			}
+		}
+	}
+	check := func() {
+		plainSummary := calPlainSummary(data, DefaultPercentilesCfg())
+		plainBuckets := calPlainBuckets(data)
+		for i, bucket := range bucketsList {
+			summary := bucket.Summary(DefaultPercentilesCfg())
+			summary.Sum = plainSummary.Sum // FIXME: accumulative errors of sum
+			if !reflect.DeepEqual(plainSummary, summary) {
+				t.Fatalf("%T summary,\nexpected:\t%v\nactual:\t%v", bucketsList[i], plainSummary, summary)
+			}
+			if !reflect.DeepEqual(plainBuckets, bucket.Buckets()) {
+				t.Fatalf("%T buckets", bucketsList[i])
+			}
 		}
 	}
 
-	plainSummary := calPlainSummary(data, DefaultPercentilesCfg())
-	plainBuckets := calPlainBuckets(data)
-	for i, bucket := range bucketsList {
-		summary := bucket.Summary(DefaultPercentilesCfg())
-		summary.Sum = plainSummary.Sum // FIXME: accumulative errors of sum
-		if !reflect.DeepEqual(plainSummary, summary) {
-			t.Fatalf("%T summary,\nexpected:\t%v\nactual:\t%v", bucketsList[i], plainSummary, summary)
-		}
-		if !reflect.DeepEqual(plainBuckets, bucket.Buckets()) {
-			t.Fatalf("%T buckets", bucketsList[i])
+	reset := func() {
+		for _, buckets := range bucketsList {
+			buckets.Reset()
 		}
 	}
+
+	prepareData()
+	check()
+	reset()
+	prepareData()
+	check()
 }
 
 func BenchmarkLPFloat_FromFloat64(b *testing.B) {

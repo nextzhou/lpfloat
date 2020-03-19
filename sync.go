@@ -159,3 +159,13 @@ func (b *SyncBuckets) Summary(percentilesCfg []float32) Summary {
 	summary.Avg = FromFloat64(sum / float64(summary.Total))
 	return summary
 }
+
+func (b *SyncBuckets) Reset() {
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	b.total = 0
+	for i := range b.layers {
+		b.layers[i].buckets = emptyBuckets
+	}
+}

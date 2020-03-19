@@ -17,11 +17,14 @@ type Buckets interface {
 	ReverseRange(func(Bucket))
 	Buckets() []Bucket
 	Summary([]float32) Summary
+	Reset()
 }
 
 var (
 	_ Buckets = &UnSyncBuckets{}
-	// _ Buckets = &SyncBuckets{} //TODO: implements SyncBuckets
+	_ Buckets = &SyncBuckets{}
+
+	emptyBuckets = [256]uint64{}
 )
 
 type Bucket struct {
