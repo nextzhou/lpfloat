@@ -7,10 +7,11 @@ import (
 
 type UnSyncBuckets struct {
 	layers []f64BucketsLayer
-	total  uint64
 }
 
 type f64BucketsLayer struct {
+	count      uint64
+	sum        float64
 	signAndExp int16
 	buckets    [256]uint64
 }
@@ -20,11 +21,13 @@ func (l *f64BucketsLayer) unit() float64 {
 }
 
 func (b *UnSyncBuckets) Insert(f float64) {
-	b.total++
 	lpf := FromFloat64(f)
 	for i := range b.layers {
-		if b.layers[i].signAndExp == lpf.SignAndExp {
-			b.layers[i].buckets[lpf.Fraction]++
+		layer := &b.layers[i]
+		if layer.signAndExp == lpf.SignAndExp {
+			layer.count++
+			layer.sum += f
+			layer.buckets[lpf.Fraction]++
 			return
 		}
 	}
@@ -32,6 +35,8 @@ func (b *UnSyncBuckets) Insert(f float64) {
 	// cold path
 	newLayer := f64BucketsLayer{signAndExp: lpf.SignAndExp}
 	newLayer.buckets[lpf.Fraction]++
+	newLayer.count++
+	newLayer.sum += f
 	b.layers = append(b.layers, newLayer)
 	sort.Slice(b.layers, func(i, j int) bool {
 		return b.layers[i].unit() < b.layers[j].unit()
@@ -39,11 +44,13 @@ func (b *UnSyncBuckets) Insert(f float64) {
 }
 
 func (b *UnSyncBuckets) InsertN(f float64, count uint64) {
-	b.total += count
 	lpf := FromFloat64(f)
 	for i := range b.layers {
-		if b.layers[i].signAndExp == lpf.SignAndExp {
-			b.layers[i].buckets[lpf.Fraction] += count
+		layer := &b.layers[i]
+		if layer.signAndExp == lpf.SignAndExp {
+			layer.buckets[lpf.Fraction] += count
+			layer.count += count
+			layer.sum += float64(count) * f
 			return
 		}
 	}
@@ -58,7 +65,11 @@ func (b *UnSyncBuckets) InsertN(f float64, count uint64) {
 }
 
 func (b *UnSyncBuckets) Total() uint64 {
-	return b.total
+	total := uint64(0)
+	for i := range b.layers {
+		total += b.layers[i].count
+	}
+	return total
 }
 
 func (b *UnSyncBuckets) Count(f float64) uint64 {
@@ -120,8 +131,10 @@ func (b *UnSyncBuckets) Summary(percentilesCfg []float32) Summary {
 	var sum float64
 	var percentileIdx int
 
+	total := b.Total()
 	for i := range b.layers {
 		layer := &b.layers[i]
+		sum += layer.sum
 		for fraction, count := range layer.buckets {
 			if count == 0 {
 				continue
@@ -132,12 +145,11 @@ func (b *UnSyncBuckets) Summary(percentilesCfg []float32) Summary {
 				summary.Min = lpf
 			}
 			summary.Total += count
-			sum += lpf.ToFloat64() * float64(count)
-			if summary.Total == b.total {
+			if summary.Total == total {
 				summary.Max = lpf
 			}
 			for percentileIdx < len(percentilesCfg) &&
-				float64(summary.Total)*100 >= float64(b.total)*float64(percentilesCfg[percentileIdx]) {
+				float64(summary.Total)*100 >= float64(total)*float64(percentilesCfg[percentileIdx]) {
 				summary.Percentiles[percentileIdx].LessThan = lpf
 				percentileIdx++
 			}
@@ -149,8 +161,10 @@ func (b *UnSyncBuckets) Summary(percentilesCfg []float32) Summary {
 }
 
 func (b *UnSyncBuckets) Reset() {
-	b.total = 0
 	for i := range b.layers {
-		b.layers[i].buckets = emptyBuckets
+		layer := &b.layers[i]
+		layer.buckets = emptyBuckets
+		layer.count = 0
+		layer.sum = 0
 	}
 }

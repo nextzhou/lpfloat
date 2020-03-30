@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 	"unsafe"
@@ -95,6 +96,36 @@ func TestLPFloat_Format(t *testing.T) {
 
 }
 
+func BenchmarkAtomicAddFloat64_Parallel(b *testing.B) {
+	var got, expected float64
+	var mutex sync.Mutex
+
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			i++
+			atomicAddFloat64(&got, float64(i))
+		}
+		mutex.Lock()
+		expected += (1 + float64(i)) * float64(i) / 2
+		mutex.Unlock()
+	})
+	if atomicLoadFloat64(&got) != expected {
+		b.Fatalf("expected %g, got %g", expected, got)
+	}
+}
+
+func BenchmarkAtomicAddFloat64(b *testing.B) {
+	var got, expected float64
+	for i := 0; i < b.N; i++ {
+		atomicAddFloat64(&got, float64(i+1))
+	}
+	expected = (1 + float64(b.N)) * float64(b.N) / 2
+	if atomicLoadFloat64(&got) != expected {
+		b.Fatalf("expected %g, got %g", expected, got)
+	}
+}
+
 func TestBuckets(t *testing.T) {
 	bucketsList := []Buckets{new(UnSyncBuckets), new(SyncBuckets)}
 
@@ -116,7 +147,6 @@ func TestBuckets(t *testing.T) {
 		plainBuckets := calPlainBuckets(data)
 		for i, bucket := range bucketsList {
 			summary := bucket.Summary(DefaultPercentilesCfg())
-			summary.Sum = plainSummary.Sum // FIXME: accumulative errors of sum
 			if !reflect.DeepEqual(plainSummary, summary) {
 				t.Fatalf("%T summary,\nexpected:\t%v\nactual:\t%v", bucketsList[i], plainSummary, summary)
 			}
@@ -172,12 +202,19 @@ func BenchmarkSyncBuckets_Insert(b *testing.B) {
 
 func BenchmarkSyncBuckets_Insert_Parallel(b *testing.B) {
 	var buckets SyncBuckets
+	// prepare random data, from 0 to 100
+	var data []float64
+	for i := 1; i < 10000; i++ {
+		data = append(data, math.Log10(float64(rand.Intn(i+1))))
+	}
+	dataLen := len(data)
 	b.ReportAllocs()
+	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
-		var n uint64
+		i := rand.Intn(dataLen)
 		for pb.Next() {
-			buckets.Insert(float64(n))
-			n++
+			buckets.Insert(data[i])
+			i = (i + 1) % dataLen
 		}
 	})
 }
@@ -210,7 +247,7 @@ func calPlainSummary(data []float64, percentilesCfg []float32) Summary {
 	buckets := calPlainBuckets(data)
 	summary.Total = uint64(len(data))
 	summary.Sum = FromFloat64(sum)
-	summary.Avg = FromFloat64(summary.Sum.ToFloat64() / float64(len(data)))
+	summary.Avg = FromFloat64(sum / float64(len(data)))
 
 	summary.Min = buckets[0].Value
 	summary.Max = buckets[len(buckets)-1].Value
