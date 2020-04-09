@@ -72,6 +72,14 @@ func (b *UnSyncBuckets) Total() uint64 {
 	return total
 }
 
+func (b *UnSyncBuckets) Sum() float64 {
+	sum := 0.0
+	for i := range b.layers {
+		sum += b.layers[i].sum
+	}
+	return sum
+}
+
 func (b *UnSyncBuckets) Count(f float64) uint64 {
 	lpf := FromFloat64(f)
 	for i := range b.layers {

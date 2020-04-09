@@ -67,6 +67,16 @@ func (b *SyncBuckets) Total() uint64 {
 	return total
 }
 
+func (b *SyncBuckets) Sum() float64 {
+	sum := 0.0
+	b.m.RLock()
+	for i := range b.layers {
+		sum += atomicLoadFloat64(&b.layers[i].sum)
+	}
+	b.m.RUnlock()
+	return sum
+}
+
 func (b *SyncBuckets) Count(f float64) uint64 {
 	lpf := FromFloat64(f)
 	b.m.RLock()
