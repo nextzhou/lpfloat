@@ -58,6 +58,8 @@ func (b *UnSyncBuckets) InsertN(f float64, count uint64) {
 	// cold path
 	newLayer := f64BucketsLayer{signAndExp: lpf.SignAndExp}
 	newLayer.buckets[lpf.Fraction] += count
+	newLayer.count += count
+	newLayer.sum += float64(count) * f
 	b.layers = append(b.layers, newLayer)
 	sort.Slice(b.layers, func(i, j int) bool {
 		return b.layers[i].unit() < b.layers[j].unit()

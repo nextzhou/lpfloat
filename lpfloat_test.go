@@ -133,18 +133,22 @@ func TestBuckets(t *testing.T) {
 	const maxVal = 100
 	const minVal = 0.01
 	data := randomData(size, minVal, maxVal)
+	finalData := make([]float64, 0, size*3)
+	finalData = append(finalData, data...)
+	finalData = append(finalData, data...)
+	finalData = append(finalData, data...)
 
 	prepareData := func() {
 		for _, buckets := range bucketsList {
 			insertBuckets(buckets, data)
-			if buckets.Total() != size {
+			if buckets.Total() != size*3 {
 				t.Fatal("")
 			}
 		}
 	}
 	check := func() {
-		plainSummary := calPlainSummary(data, DefaultPercentilesCfg())
-		plainBuckets := calPlainBuckets(data)
+		plainSummary := calPlainSummary(finalData, DefaultPercentilesCfg())
+		plainBuckets := calPlainBuckets(finalData)
 		for i, bucket := range bucketsList {
 			summary := bucket.Summary(DefaultPercentilesCfg())
 			if !reflect.DeepEqual(plainSummary, summary) {
@@ -220,6 +224,9 @@ func BenchmarkSyncBuckets_Insert_Parallel(b *testing.B) {
 }
 
 func insertBuckets(buckets Buckets, data []float64) {
+	for _, val := range data {
+		buckets.InsertN(val, 2)
+	}
 	for _, val := range data {
 		buckets.Insert(val)
 	}
